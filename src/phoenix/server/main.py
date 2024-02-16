@@ -99,40 +99,52 @@ if __name__ == "__main__":
     parser.add_argument("--umap_params", type=str, required=False, default=DEFAULT_UMAP_PARAMS_STR)
     parser.add_argument("--debug", action="store_false")
     parser.add_argument(
-        "--fixture", type=str, choices=list(FIXTURES.keys()), help="Name of the fixture to use"
+        "--fixture",
+        type=str,
+        choices=list(fixture.name for fixture in FIXTURES),
+        help="Name of the fixture to use",
+        required=False,
+        default=None,
     )
     parser.add_argument(
-        "--primary-only", type=bool, help="Only load the primary dataset from a fixture"
+        "--primary-only",
+        help="Only load the primary dataset from a fixture",
+        action="store_true",
     )
     parser.add_argument(
         "--trace-fixture",
         type=str,
-        choices=list(TRACES_FIXTURES.keys()),
+        choices=list(trace_fixture.name for trace_fixture in TRACES_FIXTURES),
         help="Name of the trace fixture to use",
+        required=False,
+        default=None,
     )
-    parser.add_argument("--simulate-streaming", type=bool)
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    parser.add_argument("--simulate-streaming", action="store_true")
+    subparsers = parser.add_subparsers(dest="command", required=False)
     serve_parser = subparsers.add_parser("serve")
-    datasets_parser = subparsers.add_parser("datasets")
-    datasets_parser.add_argument("--primary", type=str, required=True)
-    datasets_parser.add_argument("--reference", type=str, required=False)
-    datasets_parser.add_argument("--corpus", type=str, required=False)
-    datasets_parser.add_argument("--trace", type=str, required=False)
+    parser.add_argument("--primary-dataset", type=str, required=False)
+    parser.add_argument("--reference-dataset", type=str, required=False)
+    parser.add_argument("--corpus-dataset", type=str, required=False)
+    parser.add_argument("--trace-dataset", type=str, required=False)
     args = parser.parse_args()
     export_path = Path(args.export_path) if args.export_path else EXPORT_DIR
-    if args.command == "datasets":
-        primary_dataset_name = args.primary
-        reference_dataset_name = args.reference
-        corpus_dataset_name = args.corpus
+
+    if args.primary_dataset:
+        primary_dataset_name = args.primary_dataset
         primary_dataset = Dataset.from_name(primary_dataset_name)
+    if args.reference_dataset:
+        reference_dataset_name = args.reference_dataset
         reference_dataset = (
             Dataset.from_name(reference_dataset_name)
             if reference_dataset_name is not None
             else None
         )
+    if args.corpus_dataset:
+        corpus_dataset_name = args.corpus_dataset
         corpus_dataset = (
             None if corpus_dataset_name is None else Dataset.from_name(corpus_dataset_name)
         )
+
     if fixture_name := args.fixture:
         primary_only = args.primary_only
         primary_dataset, reference_dataset, corpus_dataset = get_datasets(
@@ -142,8 +154,6 @@ if __name__ == "__main__":
         if primary_only:
             reference_dataset_name = None
             reference_dataset = None
-    if trace_dataset_name := args.trace_fixture:
-        simulate_streaming = args.simulate_streaming
 
     model = create_model_from_datasets(
         primary_dataset,
@@ -151,7 +161,8 @@ if __name__ == "__main__":
     )
     traces = Traces()
     evals = Evals()
-    if trace_dataset_name is not None:
+    if trace_dataset_name :=  args.trace_fixture:
+        simulate_streaming = args.simulate_streaming
         fixture_spans = list(
             encode(json_string_to_span(json_span))
             for json_span in _download_traces_fixture(
